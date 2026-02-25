@@ -3,8 +3,12 @@ import { Pool, QueryResult } from 'pg';
 export interface RevenueReport {
   id: string;
   offering_id: string;
-  period_id: string;
-  total_revenue: string;
+  period_id?: string;
+  total_revenue?: string;
+  issuer_id?: string;
+  amount?: string;
+  period_start?: Date;
+  period_end?: Date;
   created_at: Date;
   updated_at: Date;
   [key: string]: unknown;
@@ -12,8 +16,12 @@ export interface RevenueReport {
 
 export interface CreateRevenueReportInput {
   offering_id: string;
-  period_id: string;
-  total_revenue: string;
+  period_id?: string;
+  total_revenue?: string;
+  issuer_id?: string;
+  amount?: string;
+  period_start?: Date;
+  period_end?: Date;
   [key: string]: string | number | boolean | Date | null | undefined;
 }
 
@@ -56,7 +64,7 @@ export class RevenueReportRepository {
   }
 
   /**
-   * Get a revenue report by offering and period.
+   * Get a revenue report by offering and period id.
    */
   async getByOfferingAndPeriod(
     offeringId: string,
@@ -74,6 +82,36 @@ export class RevenueReportRepository {
     const result: QueryResult<RevenueReportRow> = await this.db.query(query, [
       offeringId,
       periodId,
+    ]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRevenueReport(result.rows[0]);
+  }
+
+  /**
+   * Get a revenue report by offering and date period.
+   */
+  async findByOfferingAndPeriod(
+    offeringId: string,
+    periodStart: Date,
+    periodEnd: Date
+  ): Promise<RevenueReport | null> {
+    const query = `
+      SELECT *
+      FROM revenue_reports
+      WHERE offering_id = $1
+        AND period_start = $2
+        AND period_end = $3
+      LIMIT 1
+    `;
+
+    const result: QueryResult<RevenueReportRow> = await this.db.query(query, [
+      offeringId,
+      periodStart,
+      periodEnd,
     ]);
 
     if (result.rows.length === 0) {
@@ -104,8 +142,21 @@ export class RevenueReportRepository {
       ...(row as RevenueReport),
       id: String(row.id),
       offering_id: String(row.offering_id),
-      period_id: String(row.period_id),
-      total_revenue: String(row.total_revenue),
+      period_id:
+        row.period_id !== undefined && row.period_id !== null
+          ? String(row.period_id)
+          : undefined,
+      total_revenue:
+        row.total_revenue !== undefined && row.total_revenue !== null
+          ? String(row.total_revenue)
+          : undefined,
+      issuer_id:
+        row.issuer_id !== undefined && row.issuer_id !== null
+          ? String(row.issuer_id)
+          : undefined,
+      amount: row.amount !== undefined && row.amount !== null ? String(row.amount) : undefined,
+      period_start: (row.period_start as Date | undefined) ?? undefined,
+      period_end: (row.period_end as Date | undefined) ?? undefined,
       created_at: row.created_at as Date,
       updated_at: row.updated_at as Date,
     };
